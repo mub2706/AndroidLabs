@@ -2,6 +2,7 @@ package com.cst3104.androidlab6;
 
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
+import androidx.room.PrimaryKey;
 
 @Entity
 public class ChatMessage {
@@ -11,6 +12,10 @@ public class ChatMessage {
     protected String timeSent;
     @ColumnInfo(name="Send0rReceive")
     protected boolean isSentButton;
+
+    @PrimaryKey (autoGenerate = true)
+    @ColumnInfo (name="id")
+    public int id;
 
     // Constructor
     public ChatMessage(String message, String timeSent, boolean isSentButton) {
