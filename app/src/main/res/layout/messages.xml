@@ -10,19 +10,22 @@
         android:layout_width="155dp"
         android:layout_height="48dp"
         android:text="message goes here"
-        app:layout_constraintTop_toBottomOf="@+id/timeMessage"
-        tools:layout_editor_absoluteX="16dp" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.136"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/timeMessage" />
 
     <TextView
         android:id="@+id/timeMessage"
         android:layout_width="113dp"
         android:layout_height="39dp"
-        android:layout_marginStart="32dp"
+        android:layout_marginStart="16dp"
         android:text="time goes here"
         android:textSize="10dp"
-        app:layout_constraintBottom_toTopOf="@+id/textMessage"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.0" />
 
     <TextView
         android:id="@+id/timeMessage1"
@@ -31,8 +34,12 @@
         android:layout_gravity="right"
         android:text="time goes here"
         android:textSize="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintHorizontal_bias="0.946"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.0" />
 
     <TextView
         android:id="@+id/textMessage1"

@@ -1,5 +1,17 @@
 package com.cst3104.androidlab6;
 
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -7,17 +19,12 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.room.Room;
-import android.icu.text.SimpleDateFormat;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.TextView;
+
 import com.cst3104.androidlab6.databinding.ActivityChatRoomBinding;
 import com.cst3104.androidlab6.databinding.MessagesBinding;
 import com.google.android.material.snackbar.Snackbar;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -31,38 +38,92 @@ public class ChatRoom extends AppCompatActivity {
     ChatRoomViewModel chatModel ;
     private RecyclerView.Adapter myAdapter;
     private ChatMessageDAO mDAO;
+
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.item1) {
+            int selectedPosition = myAdapter.getItemCount() > 0 ? 0 : RecyclerView.NO_POSITION;
+            if (selectedPosition != RecyclerView.NO_POSITION) {
+                showDeleteConfirmationDialog(selectedPosition);
+            }
+            return true;
+        } else if (item.getItemId() == R.id.aboutItem) {
+            // Display About toast
+            Toast.makeText(this, "Version 1.0 , created by Mubarak Hassan", Toast.LENGTH_SHORT).show();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.my_menu, menu);
+
+        return true;
+    }
+
+    private void showDeleteConfirmationDialog(int position) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Question:");
+        builder.setMessage("Do you want to delete the message: " + messages.get(position).getMessage());
+        builder.setPositiveButton("Yes", (dialog, cl) -> {
+            Executors.newSingleThreadExecutor().execute(() -> {
+                ChatMessage selectedMessage = messages.get(position);
+                mDAO.deleteMessage(selectedMessage);
+
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    messages.remove(position);
+                    myAdapter.notifyItemRemoved(position);
+
+                    Snackbar.make(binding.getRoot(), "You deleted the message", Snackbar.LENGTH_LONG)
+                            .setAction("Undo", clw -> {
+                                // Undo deletion
+                                messages.add(position, selectedMessage);
+                                myAdapter.notifyItemInserted(position);
+                            })
+                            .show();
+                });
+            });
+        });
+
+        builder.setNegativeButton("No", (dialog, cl) -> {
+            // Do nothing if the user chooses not to delete the message
+        });
+
+        builder.create().show();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
-        MessageDatabase db = Room.databaseBuilder(getApplicationContext(), MessageDatabase.class, "database-name").build();
-        mDAO = db.cmDAO();
-
-        if (messages == null)
-        {
-            chatModel.messages.setValue(messages = new ArrayList<>());
-            Executor thread = Executors.newSingleThreadExecutor();
-            thread.execute(() ->
-            {
-                messages.addAll(mDAO.getAllMessages()); // Once you get the data from database
-                runOnUiThread(() -> binding.recycleView.setAdapter(myAdapter)); // You can then load the RecyclerView
-            });
-        }
 
         super.onCreate(savedInstanceState);
         chatModel = new ViewModelProvider(this).get(ChatRoomViewModel.class);
         binding = ActivityChatRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        messages = chatModel.messages.getValue();
-        messagesReceive = chatModel.messagesReceive.getValue();
+        setSupportActionBar(binding.toolbar);
+
+        if (chatModel.messages.getValue() == null) {
+            chatModel.messages.postValue(new ArrayList<>());
+        }
+
+        MessageDatabase db = Room.databaseBuilder(getApplicationContext(), MessageDatabase.class, "database-name").build();
+
+        mDAO = db.cmDAO();
 
         binding.recycleView.setLayoutManager(new LinearLayoutManager(this));
-        if (messages == null) {
-            chatModel.messages.postValue(new ArrayList<ChatMessage>());
-        }
-        if (messagesReceive == null) {
-            chatModel.messagesReceive.postValue(new ArrayList<ChatMessage>());
-        }
+
+        Executor thread = Executors.newSingleThreadExecutor();
+        thread.execute(() -> {
+            messages.addAll(mDAO.getAllMessages());
+            runOnUiThread(() -> {
+                myAdapter.notifyDataSetChanged();
+                binding.recycleView.setAdapter(myAdapter);
+            });
+        });
 
         // Send Button
         binding.button.setOnClickListener(click -> {
@@ -78,7 +139,6 @@ public class ChatRoom extends AppCompatActivity {
             binding.editText.setText("");
             messages.add(chatMessage);
             myAdapter.notifyItemInserted(messages.size() - 1);
-
         });
 
         // Receive Button
