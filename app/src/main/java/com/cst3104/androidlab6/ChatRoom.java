@@ -32,13 +32,12 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 public class ChatRoom extends AppCompatActivity {
+
     ActivityChatRoomBinding binding;
     ArrayList<ChatMessage> messages = new ArrayList<>();
-    ArrayList<ChatMessage> messagesReceive = new ArrayList<>();
-    ChatRoomViewModel chatModel ;
-    private RecyclerView.Adapter myAdapter;
-    private ChatMessageDAO mDAO;
-
+    ChatRoomViewModel chatModel;
+    private RecyclerView.Adapter<MyRowHolder> myAdapter;
+    ChatMessageDAO mDAO;
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
@@ -50,20 +49,21 @@ public class ChatRoom extends AppCompatActivity {
             return true;
         } else if (item.getItemId() == R.id.aboutItem) {
             // Display About toast
-            Toast.makeText(this, "Version 1.0 , created by Mubarak Hassan", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Version 1.0, created by Mubarak Hassan", Toast.LENGTH_SHORT).show();
             return true;
         } else {
             return super.onOptionsItemSelected(item);
         }
     }
 
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.my_menu, menu);
-
         return true;
     }
+
 
     private void showDeleteConfirmationDialog(int position) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -98,7 +98,6 @@ public class ChatRoom extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
         chatModel = new ViewModelProvider(this).get(ChatRoomViewModel.class);
         binding = ActivityChatRoomBinding.inflate(getLayoutInflater());
@@ -110,7 +109,11 @@ public class ChatRoom extends AppCompatActivity {
             chatModel.messages.postValue(new ArrayList<>());
         }
 
-        MessageDatabase db = Room.databaseBuilder(getApplicationContext(), MessageDatabase.class, "database-name").build();
+        MessageDatabase db = Room.databaseBuilder(
+                getApplicationContext(),
+                MessageDatabase.class,
+                "database-name"
+        ).build();
 
         mDAO = db.cmDAO();
 
@@ -125,10 +128,9 @@ public class ChatRoom extends AppCompatActivity {
             });
         });
 
-        // Send Button
         binding.button.setOnClickListener(click -> {
             if (messages == null) {
-                chatModel.messages.postValue(messages = new ArrayList<>());
+                chatModel.messages.postValue(messages = new ArrayList<ChatMessage>());
             }
 
             String messageText = binding.editText.getText().toString();
@@ -139,14 +141,14 @@ public class ChatRoom extends AppCompatActivity {
             binding.editText.setText("");
             messages.add(chatMessage);
             myAdapter.notifyItemInserted(messages.size() - 1);
+
+            // Perform database operation in a background thread
+            Executors.newSingleThreadExecutor().execute(() -> {
+                mDAO.insertMessage(chatMessage);
+            });
         });
 
-        // Receive Button
         binding.button2.setOnClickListener(click -> {
-            if (messagesReceive == null) {
-                chatModel.messagesReceive.postValue(messagesReceive = new ArrayList<ChatMessage>());
-            }
-
             String messageText = binding.editText.getText().toString();
             SimpleDateFormat sdf = new SimpleDateFormat("EEEE, dd-MMM-yyyy hh-mm-ss a");
             String currentTime = sdf.format(new Date());
@@ -154,19 +156,19 @@ public class ChatRoom extends AppCompatActivity {
             ChatMessage chatMessage = new ChatMessage(messageText, currentTime, false);
             binding.editText.setText("");
 
-            messagesReceive.add(chatMessage);
-            messages.add(chatMessage); // Add to both lists to keep them in sync
-
-            myAdapter.notifyItemInserted(messagesReceive.size() - 1);
+            messages.add(chatMessage); // Add to the list to keep them in sync
+            myAdapter.notifyItemInserted(messages.size() - 1);
+            Executors.newSingleThreadExecutor().execute(() -> {
+                mDAO.insertMessage(chatMessage);
+            });
         });
 
         binding.recycleView.setAdapter(myAdapter = new RecyclerView.Adapter<MyRowHolder>() {
             @NonNull
             @Override
             public MyRowHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-
                 MessagesBinding binding = MessagesBinding.inflate(getLayoutInflater());
-                return new MyRowHolder(binding.getRoot(), mDAO, messages, myAdapter);
+                return new MyRowHolder(binding.getRoot(), mDAO, myAdapter, messages);
             }
 
             @Override
@@ -199,27 +201,22 @@ public class ChatRoom extends AppCompatActivity {
                 }
             }
 
+
             public int getItemViewType(int position) {
                 ChatMessage message = messages.get(position);
-                if (message.isSentButton()) {
-                    return 0;
-                }
-                else return 1;
+                return message.isSentButton() ? 0 : 1;
             }
 
             @Override
             public int getItemCount() {
-                if (messages != null) {
-                    return messages.size();
-                } else {
-                    return 0;
-                }
+                return messages.size();
             }
         });
     }
 }
 
 class MyRowHolder extends RecyclerView.ViewHolder {
+
     TextView messageText;
     TextView timeText;
     TextView messageText1;
@@ -228,21 +225,15 @@ class MyRowHolder extends RecyclerView.ViewHolder {
     private RecyclerView.Adapter<MyRowHolder> myAdapter;
     private Handler handler = new Handler(Looper.getMainLooper());
 
-    public MyRowHolder(@NonNull View itemView, ChatMessageDAO mDAO, List<ChatMessage> messages, RecyclerView.Adapter<MyRowHolder> myAdapter) {
+    public MyRowHolder(@NonNull View itemView, ChatMessageDAO mDAO, RecyclerView.Adapter<MyRowHolder> myAdapter, ArrayList<ChatMessage> messages) {
         super(itemView);
-        this.messages = messages;
-        this.myAdapter = myAdapter;
 
         itemView.setOnClickListener(clk -> {
-
             int position = getAbsoluteAdapterPosition();
 
             AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
             builder.setTitle("Question: ");
-            builder.setMessage("Do you want to delete the messages: " + messageText.getText());
-            builder.setMessage("Do you want to delete the messages: " + messageText1.getText());
-
-            // Yes Button
+            builder.setMessage("Do you want to delete the messages: " + messages.get(position).getMessage());
             builder.setPositiveButton("Yes", (dialog, cl) -> {
                 Executors.newSingleThreadExecutor().execute(() -> {
                     ChatMessage m = messages.get(position);
@@ -263,12 +254,8 @@ class MyRowHolder extends RecyclerView.ViewHolder {
                 });
             });
 
-            // No Button
-            builder.setNegativeButton("No", (dialog, cl) -> {
-            });
+            builder.setNegativeButton("No", (dialog, cl) -> {});
             builder.create().show();
-            AlertDialog alertDialog = builder.create();
-            alertDialog.show();
         });
 
         messageText = itemView.findViewById(R.id.textMessage);
